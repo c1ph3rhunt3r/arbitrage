@@ -108,7 +108,7 @@ pub struct SetupResult {
     // pub record_account: Pubkey,
     pub balance: u64,
     pub blockhash: Hash,
-    pub flashloan_keys: AHashMap<Pubkey, (Pubkey, Pubkey)>,
+    pub flashloan_keys: AHashMap<Pubkey, (Pubkey, Pubkey, Pubkey, Pubkey)>,
     pub alt: AddressLookupTableAccount,
     pub tx_balance: Sender<u64>,
     pub tx_blockhash: Sender<Hash>,

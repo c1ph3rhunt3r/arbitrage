@@ -78,12 +78,7 @@ pub async fn get_searcher_client_without_interceptor(
 pub async fn create_grpc_channel(url: &str, cert_path: &str) -> BlockEngineConnectionResult<Channel> {
     let mut endpoint = Endpoint::from_shared(url.to_string()).expect("invalid url");
     if url.contains("https") {
-        // macos - /etc/ssl/cert.pem
-        let pem = tokio::fs::read(cert_path)
-            .await
-            .expect("oh no, the cert file wasn't loaded");
-        let cert = Certificate::from_pem(pem);
-        endpoint = endpoint.tls_config(tonic::transport::ClientTlsConfig::new().ca_certificate(cert))?;
+        endpoint = endpoint.tls_config(tonic::transport::ClientTlsConfig::new())?;
     }
     Ok(endpoint.connect().await?)
 }

@@ -90,8 +90,8 @@ impl Provider for ProviderBloxroute {
         let mut rx_blockhash = setup.tx_blockhash.subscribe();
 
         let flashloan_keys = setup.flashloan_keys;
-        let (pool, pool_ata) = match flashloan_keys.get(&WSOL) {
-            Some((pool, pool_ata)) => (*pool, *pool_ata),
+        let (lending_market, reserve, supply_vault, fee_vault) = match flashloan_keys.get(&WSOL) {
+            Some(keys) => *keys,
             None => panic!("No flashloan keys found for WSOL"),
         };
 
@@ -205,13 +205,10 @@ impl Provider for ProviderBloxroute {
 
                         if use_flash_loan {
                             let amount = amount_for_flashloan(optimize.amount);
-                            builder.push_ix(preparation.to_floashloan_ix(
-                                amount,
-                                tip_result.total_tip,
-                                pool_ata,
-                                pool,
-                                token_ata_wsol,
-                            ));
+                            let flashloan_ixs = preparation.to_kamino_flashloan_ixs(amount, tip_result.total_tip, keypair.pubkey(), lending_market, reserve, supply_vault, fee_vault, token_ata_wsol);
+                            for ix in flashloan_ixs {
+                                builder.push_ix(ix);
+                            }
                         } else {
                             builder.push_ix(preparation.to_instruction(tip_result.total_tip));
                         }

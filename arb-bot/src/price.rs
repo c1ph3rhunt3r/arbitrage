@@ -1912,7 +1912,7 @@ pub fn optimize_universal(
 
     let mut budget = Budget {
         max_evals: 200,
-        top_k: 1, // ak fia nemá lokálne maximá, top_k == 1 => výrazne rýchlejšie
+        top_k: 1, // if fia has no local maxima, top_k == 1 => significantly faster
         mc_n: 8,
         risk_lambda: 0.0,
     };
@@ -2068,9 +2068,9 @@ pub fn optimize_convex(
     let mut lo = volume;
     let mut delta: u64 = lo / DELTA_FACTOR;
     let mut hi = VOLUMES.iter().copied().max().unwrap_or(500_000_000_000);
-    // Aby sme sa vyhli nekonečnej slučke, skončíme keď je interval malý
-    while hi.saturating_sub(lo) > 5 {
-        // Pozície tretín (pozor na pretečenie)
+    // To avoid an infinite loop, stop when the interval is small
+    while hi.saturating_sub(lo) > 300_000_000 {
+        // Thirds positions (beware of overflow)
         let third = (hi - lo) / 3;
         let m1 = lo + third;
         let m2 = hi - third;
@@ -2082,9 +2082,9 @@ pub fn optimize_convex(
             .unwrap_or((i64::MIN, vec![], vec![]));
         diff_to_helpers.insert(f2, (amounts, remaining_accounts));
 
-        // Pri unimodálnej funkcii platí:
-        // - ak f1 < f2, maximum je vpravo od m1 (posuň lo)
-        // - inak je vľavo od m2 (posuň hi)
+        // For a unimodal function:
+        // - if f1 < f2, maximum is to the right of m1 (shift lo)
+        // - otherwise it is to the left of m2 (shift hi)
         delta = lo / DELTA_FACTOR;
         if f1 < f2 {
             lo = m1 + delta;
@@ -2093,7 +2093,7 @@ pub fn optimize_convex(
         }
     }
 
-    // Dofinišujeme lineárnym dohľadaním v úzkom intervale
+    // Finish with a linear search in the narrow interval
     let mut best_v = lo;
     let (mut best_s, amounts, remaining_accounts) =
         find_optimum_v4(slot, lo, calculators, starting_mint, mint_pair_route).unwrap_or((i64::MIN, vec![], vec![]));

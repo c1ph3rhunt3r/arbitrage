@@ -90,35 +90,52 @@ impl ArbitrageCompressedInstructionInput {
             data,
         }
     }
-
-    pub fn to_floashloan_ix(
+    pub fn to_kamino_flashloan_ixs(
         &self,
         flashloan_amount: u64,
         amount: u64,
-        pool_ata: Pubkey,
-        pool: Pubkey,
+        bot_authority: Pubkey,
+        lending_market: Pubkey,
+        reserve: Pubkey,
+        supply_vault: Pubkey,
+        fee_vault: Pubkey,
         ata_wsol: Pubkey,
-    ) -> Instruction {
-        let ix = self.to_instruction(amount);
-        let mut accounts = vec![
-            AccountMeta::new(pool_ata, false),
-            AccountMeta::new_readonly(pool, false),
-            AccountMeta::new(ata_wsol, false),
-            // AccountMeta::new_readonly(signer, true),
-            AccountMeta::new_readonly(ix.program_id, false),
-        ];
-        accounts.extend(ix.accounts);
-        if accounts.len() > 64 {
-            warn!("{} accounts in cpi instructions ...", accounts.len());
-        }
-        let mut data = vec![8];
-        data.extend(flashloan_amount.to_le_bytes());
-        data.extend(ix.data);
-        Instruction {
-            program_id: FLASHLOAN_ID,
-            accounts,
-            data,
-        }
+    ) -> Vec<Instruction> {
+        let (lending_market_authority, _) = Pubkey::find_program_address(&[b"lma", lending_market.as_ref()], &utils::constants::FLASHLOAN_ID);
+
+        let borrow_accounts = klend_interface::instructions::FlashBorrowReserveLiquidityAccounts {
+            user_transfer_authority: bot_authority,
+            lending_market_authority,
+            lending_market,
+            reserve,
+            reserve_liquidity_mint: spl_token::native_mint::ID,
+            reserve_source_liquidity: supply_vault,
+            user_destination_liquidity: ata_wsol,
+            reserve_liquidity_fee_receiver: fee_vault,
+            referrer_token_state: None,
+            referrer_account: None,
+            token_program: spl_token::ID,
+        };
+
+        let repay_accounts = klend_interface::instructions::FlashRepayReserveLiquidityAccounts {
+            user_transfer_authority: bot_authority,
+            lending_market_authority,
+            lending_market,
+            reserve,
+            reserve_liquidity_mint: spl_token::native_mint::ID,
+            reserve_destination_liquidity: supply_vault,
+            user_source_liquidity: ata_wsol,
+            reserve_liquidity_fee_receiver: fee_vault,
+            referrer_token_state: None,
+            referrer_account: None,
+            token_program: spl_token::ID,
+        };
+
+        let borrow_ix = klend_interface::instructions::flash_borrow_reserve_liquidity(borrow_accounts, flashloan_amount);
+        let arb_ix = self.to_instruction(amount);
+        let repay_ix = klend_interface::instructions::flash_repay_reserve_liquidity(repay_accounts, flashloan_amount, 0);
+
+        vec![borrow_ix, arb_ix, repay_ix]
     }
 }
 
@@ -137,58 +154,52 @@ impl ArbitrageInstructionInput {
         }
     }
 
-    pub fn to_floashloan_ix(
+    pub fn to_kamino_flashloan_ixs(
         &self,
         flashloan_amount: u64,
         amount: u64,
-        pool_ata: Pubkey,
-        pool: Pubkey,
+        bot_authority: Pubkey,
+        lending_market: Pubkey,
+        reserve: Pubkey,
+        supply_vault: Pubkey,
+        fee_vault: Pubkey,
         ata_wsol: Pubkey,
-    ) -> Instruction {
-        let ix = self.to_instruction(amount);
-        let mut accounts = vec![
-            AccountMeta::new(pool_ata, false),
-            AccountMeta::new_readonly(pool, false),
-            AccountMeta::new(ata_wsol, false),
-            // AccountMeta::new_readonly(signer, true),
-            AccountMeta::new_readonly(ix.program_id, false),
-        ];
-        accounts.extend(ix.accounts);
-        if accounts.len() > 64 {
-            warn!("{} accounts in cpi instructions ...", accounts.len());
-        }
-        let mut data = vec![8];
-        data.extend(flashloan_amount.to_le_bytes());
-        data.extend(ix.data);
-        Instruction {
-            program_id: FLASHLOAN_ID,
-            accounts,
-            data,
-        }
-    }
+    ) -> Vec<Instruction> {
+        let (lending_market_authority, _) = Pubkey::find_program_address(&[b"lma", lending_market.as_ref()], &utils::constants::FLASHLOAN_ID);
 
-    pub fn to_floashloan_reduced_ix(
-        &self,
-        flashloan_amount: u64,
-        amount: u64,
-        pool_ata: Pubkey,
-        pool: Pubkey,
-    ) -> Instruction {
-        let ix = self.to_instruction(amount);
-        let mut accounts = vec![
-            AccountMeta::new(pool_ata, false),
-            AccountMeta::new_readonly(pool, false),
-            AccountMeta::new_readonly(ix.program_id, false),
-        ];
-        accounts.extend(ix.accounts);
-        let mut data = vec![6];
-        data.extend(flashloan_amount.to_le_bytes());
-        data.extend(ix.data);
-        Instruction {
-            program_id: FLASHLOAN_ID,
-            accounts,
-            data,
-        }
+        let borrow_accounts = klend_interface::instructions::FlashBorrowReserveLiquidityAccounts {
+            user_transfer_authority: bot_authority,
+            lending_market_authority,
+            lending_market,
+            reserve,
+            reserve_liquidity_mint: spl_token::native_mint::ID,
+            reserve_source_liquidity: supply_vault,
+            user_destination_liquidity: ata_wsol,
+            reserve_liquidity_fee_receiver: fee_vault,
+            referrer_token_state: None,
+            referrer_account: None,
+            token_program: spl_token::ID,
+        };
+
+        let repay_accounts = klend_interface::instructions::FlashRepayReserveLiquidityAccounts {
+            user_transfer_authority: bot_authority,
+            lending_market_authority,
+            lending_market,
+            reserve,
+            reserve_liquidity_mint: spl_token::native_mint::ID,
+            reserve_destination_liquidity: supply_vault,
+            user_source_liquidity: ata_wsol,
+            reserve_liquidity_fee_receiver: fee_vault,
+            referrer_token_state: None,
+            referrer_account: None,
+            token_program: spl_token::ID,
+        };
+
+        let borrow_ix = klend_interface::instructions::flash_borrow_reserve_liquidity(borrow_accounts, flashloan_amount);
+        let arb_ix = self.to_instruction(amount);
+        let repay_ix = klend_interface::instructions::flash_repay_reserve_liquidity(repay_accounts, flashloan_amount, 0);
+
+        vec![borrow_ix, arb_ix, repay_ix]
     }
 
     pub fn push(&mut self, ix: Instruction) {

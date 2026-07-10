@@ -56,14 +56,14 @@ pub fn process_meteora_dlmm(
         //     }
         // }
     } else if data.starts_with(&dex::meteora_dlmm::accounts::BIN_ARRAY_BITMAP_EXTENSION_ACCOUNT_DISCM) {
-        // TODO: ak sú len 2-comb, tu by som nemal vkladať bitmap_extension, ak bitmap_extension.lb_pair nemá WSOL!
-        // Možné riešenie: zaviesť HashMap ignorovaných pool-ov (všeobecne, nie podľa pool_type)
+        // TODO: if only 2-comb, we shouldn't insert bitmap_extension here if bitmap_extension.lb_pair doesn't have WSOL!
+        // Possible solution: introduce a HashMap of ignored pools (generally, not by pool_type)
         let bitmap_extension = dex::meteora_dlmm::accounts::BinArrayBitmapExtensionAccount::deserialize(data)
             .context("Failed to deserialize meteora dlmm bitmap extension")?
             .0;
         meteora_dlmm_bitmap_extensions.insert(bitmap_extension.lb_pair, (pubkey, bitmap_extension));
     } else if data.starts_with(&dex::meteora_dlmm::accounts::BIN_ARRAY_ACCOUNT_DISCM) {
-        // TODO: ak sú len 2-comb, tu by som nemal vkladať bin_array, ak bin_array.lb_pair nemá WSOL!
+        // TODO: if only 2-comb, we shouldn't insert bin_array here if bin_array.lb_pair doesn't have WSOL!
         let bin_array = dex::meteora_dlmm::BinArrayAccount::deserialize(data)
             .context("Failed to deserialize meteora dlmm bin array")?
             .0;
@@ -120,11 +120,29 @@ pub fn spawn_meteora_dlmm(
     cfg_opt: Option<RpcProgramAccountsConfig>,
 ) -> tokio::task::JoinHandle<MeteoraDlmmGPAResult> {
     tokio::spawn(async move {
-        let result = if let Some(rpc_cfg) = cfg_opt {
+        let mut result = if let Some(rpc_cfg) = cfg_opt {
             crate::gpa::fetch_program_accounts_with_config(&url, &dex::meteora_dlmm::ID, rpc_cfg).await
         } else {
             crate::gpa::fetch_program_accounts(&url, &dex::meteora_dlmm::ID).await
         };
+        
+        // Attempt to load hardcoded pools
+        if let Ok(file_content) = std::fs::read_to_string("pools.json") {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&file_content) {
+                if let Some(meteora_pools) = json.get("meteora").and_then(|v| v.as_array()) {
+                    let mut pubkeys = Vec::new();
+                    for p in meteora_pools {
+                        if let Some(s) = p.as_str() {
+                            if let Ok(pubkey) = std::str::FromStr::from_str(s) {
+                                pubkeys.push(pubkey);
+                            }
+                        }
+                    }
+                    let hardcoded_accounts = crate::gpa::get_multiple_accounts_batched(&url, &pubkeys).await;
+                    result.extend(hardcoded_accounts);
+                }
+            }
+        }
         let mut meteora_dlmm_pools = HashMap::new();
         let mut meteora_dlmm_bin_arrays: HashMap<Pubkey, BTreeMap<i32, (Pubkey, dex::meteora_dlmm::BinArray)>> =
             HashMap::new();

@@ -61,6 +61,7 @@ pub const DEFAULT_SERVICE_NAME: &str = "arb.service";
 #[serde(default)]
 #[allow(unused)]
 pub struct Config {
+    pub dry_run: bool,
     pub name: String,
     pub log_level: SerdeLevelFilter,
     pub rpc: String,
@@ -86,6 +87,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
+            dry_run: false,
             log_level: SerdeLevelFilter(LevelFilter::Info),
             rpc: String::from(DEFAULT_RPC_URL),
             name: "".to_string(),

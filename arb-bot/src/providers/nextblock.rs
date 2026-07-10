@@ -87,8 +87,8 @@ impl Provider for ProviderNextblock {
         let mut rx_blockhash = setup.tx_blockhash.subscribe();
 
         let flashloan_keys = setup.flashloan_keys;
-        let (pool, pool_ata) = match flashloan_keys.get(&WSOL) {
-            Some((pool, pool_ata)) => (*pool, *pool_ata),
+        let (lending_market, reserve, supply_vault, fee_vault) = match flashloan_keys.get(&WSOL) {
+            Some(keys) => *keys,
             None => panic!("No flashloan keys found for WSOL"),
         };
 
@@ -225,7 +225,10 @@ impl Provider for ProviderNextblock {
 
                             if use_flash_loan {
                                 let amount = amount_for_flashloan(optimize.amount);
-                                builder.push_ix(preparation.to_floashloan_ix(amount, tip_result.total_tip, pool_ata, pool, token_ata_wsol));
+                                let flashloan_ixs = preparation.to_kamino_flashloan_ixs(amount, tip_result.total_tip, keypair.pubkey(), lending_market, reserve, supply_vault, fee_vault, token_ata_wsol);
+                                for ix in flashloan_ixs {
+                                    builder.push_ix(ix);
+                                }
                             } else {
                                 builder.push_ix(preparation.to_instruction(tip_result.total_tip));
                             }
@@ -235,7 +238,10 @@ impl Provider for ProviderNextblock {
                                 let mut simulation_builder = builder.clone();
                                 simulation_builder.add_compute_unit_limit(tip_result.compute_unit_limit as u32);
                                 simulation_builder.add_compute_unit_price((tip_result.compute_unit_price).min(1_200_000));
-                                //simulation_builder.push_ix(preparation.to_floashloan_ix(amount, tip_result.total_tip, pool_ata, pool, token_ata_wsol));
+                                // let flashloan_ixs = preparation.to_kamino_flashloan_ixs(amount, tip_result.total_tip, keypair.pubkey(), lending_market, reserve, supply_vault, fee_vault, token_ata_wsol);
+                                // for ix in flashloan_ixs {
+                                //     simulation_builder.push_ix(ix);
+                                // }
                                 simulation_builder.add_nextblock_tip_ix(tip_result.provider_tip);
 
                                 let txn = simulation_builder.prepare_tx(&keypair, &alts, blockhash);
@@ -281,7 +287,10 @@ impl Provider for ProviderNextblock {
 
                             builder.add_compute_unit_limit(tip_result.compute_unit_limit as u32);
                             builder.add_compute_unit_price(tip_result.compute_unit_price);
-                            //builder.push_ix(preparation.to_floashloan_ix(amount, tip_result.total_tip, pool_ata, pool, token_ata_wsol ));
+                            // let flashloan_ixs = preparation.to_kamino_flashloan_ixs(amount, tip_result.total_tip, keypair.pubkey(), lending_market, reserve, supply_vault, fee_vault, token_ata_wsol);
+                            // for ix in flashloan_ixs {
+                            //     builder.push_ix(ix);
+                            // }
                             builder.add_nextblock_tip_ix(tip_result.provider_tip);
                             let txn = builder.prepare_tx(&keypair, &alts, blockhash);
                                 if let Ok(txn) = txn {

@@ -80,8 +80,8 @@ impl Provider for ProviderLog {
         let mut rx_blockhash = setup.tx_blockhash.subscribe();
 
         let flashloan_keys = setup.flashloan_keys;
-        let (pool, pool_ata) = match flashloan_keys.get(&WSOL) {
-            Some((pool, pool_ata)) => (*pool, *pool_ata),
+        let (lending_market, reserve, supply_vault, fee_vault) = match flashloan_keys.get(&WSOL) {
+            Some(keys) => *keys,
             None => panic!("No flashloan keys found for WSOL"),
         };
 
@@ -160,7 +160,10 @@ impl Provider for ProviderLog {
                                 builder.add_compute_unit_limit(compute_unit_limit as u32);
                                 builder.add_compute_unit_price(10_000);
                                 let amount = amount_for_flashloan(optimize.amount);
-                                builder.push_ix(preparation.to_floashloan_ix(amount, 0, pool_ata, pool, token_ata_wsol));
+                                let flashloan_ixs = preparation.to_kamino_flashloan_ixs(amount, 0, keypair.pubkey(), lending_market, reserve, supply_vault, fee_vault, token_ata_wsol);
+                                for ix in flashloan_ixs {
+                                    builder.push_ix(ix);
+                                }
 
                                 let txn = builder.prepare_tx(&keypair, &alts, blockhash);
 

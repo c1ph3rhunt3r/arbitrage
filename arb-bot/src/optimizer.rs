@@ -62,7 +62,14 @@ pub fn spawn_optimization(
                     &mint_pair_route,
                     &WSOL,
                 ) {
-                    Ok(optimize_result) => {
+                    Ok(mut optimize_result) => {
+                        let flashloan_fee = optimize_result.amount / 100_000;
+                        if optimize_result.diff > flashloan_fee {
+                            optimize_result.diff -= flashloan_fee;
+                        } else {
+                            optimize_result.diff = 0;
+                        }
+                        
                         if optimize_result.diff > minimum_filter
                             && optimize_result.amounts.len() >= 2
                             && optimize_result.remaining_accounts.len() >= 2

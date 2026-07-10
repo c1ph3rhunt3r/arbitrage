@@ -406,7 +406,7 @@ pub fn process_arbitrage_v6(
 
         let mut simple_swap = false;
         if calculator.get_pool_type() == PoolType::PumpAmm && next_ix.data.starts_with(&dex::pump_amm::BUY_IX_DISCM) {
-            // starting mint sa nemôže close
+            // starting mint cannot be closed
             keep_mints.insert(starting_mint);
             simple_swap = true;
         }

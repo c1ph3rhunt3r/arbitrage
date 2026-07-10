@@ -73,14 +73,7 @@ fn new_rpc_client(url: &str) -> RpcClient {
 }
 
 async fn fetch_program_accounts(url: &str, program_id: &Pubkey) -> Vec<(Pubkey, Account)> {
-    let client = new_rpc_client(url);
-    match client.get_program_accounts(program_id).await {
-        Ok(accounts) => accounts,
-        Err(e) => {
-            error!("GPA: Failed to fetch program accounts for {:?}: {:?}", program_id, e);
-            vec![]
-        }
-    }
+    vec![]
 }
 
 async fn fetch_program_accounts_with_config(
@@ -88,17 +81,7 @@ async fn fetch_program_accounts_with_config(
     program_id: &Pubkey,
     config: RpcProgramAccountsConfig,
 ) -> Vec<(Pubkey, Account)> {
-    let client = new_rpc_client(url);
-    match client.get_program_accounts_with_config(program_id, config).await {
-        Ok(accounts) => accounts,
-        Err(e) => {
-            error!(
-                "GPA: Failed to fetch program accounts with config for {:?}: {:?}",
-                program_id, e
-            );
-            vec![]
-        }
-    }
+    vec![]
 }
 
 #[inline(always)]
@@ -106,37 +89,36 @@ async fn sleep() {
     tokio::time::sleep(Duration::from_secs(5)).await;
 }
 
+pub async fn get_multiple_accounts_batched(
+    url: &str,
+    pubkeys: &[Pubkey],
+) -> Vec<(Pubkey, Account)> {
+    let client = new_rpc_client(url);
+    let mut results = Vec::new();
+    for chunk in pubkeys.chunks(100) {
+        match client.get_multiple_accounts(chunk).await {
+            Ok(accounts) => {
+                for (i, opt_acc) in accounts.into_iter().enumerate() {
+                    if let Some(acc) = opt_acc {
+                        results.push((chunk[i], acc));
+                    }
+                }
+            }
+            Err(e) => {
+                error!("GMA: Failed to fetch multiple accounts chunk: {:?}", e);
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+    results
+}
+
 pub async fn get_program_accounts(
     rpc_client: &RpcClient,
     program_id: &Pubkey,
     discriminators: Vec<[u8; 8]>,
 ) -> anyhow::Result<Vec<(Pubkey, Account)>> {
-    let mut all_accounts = Vec::new();
-
-    for discriminator in discriminators {
-        let filters = vec![RpcFilterType::Memcmp(Memcmp::new(
-            0, // Discriminator is at the start of the account data
-            MemcmpEncodedBytes::Bytes(discriminator.to_vec()),
-        ))];
-        let config = RpcProgramAccountsConfig {
-            filters: Some(filters.clone()),
-            account_config: RpcAccountInfoConfig {
-                encoding: Some(UiAccountEncoding::Base64),
-                data_slice: None,
-                commitment: Some(CommitmentConfig::processed()),
-                min_context_slot: None,
-            },
-            with_context: None,
-            sort_results: None,
-        };
-        let accounts = match rpc_client.get_program_accounts_with_config(program_id, config).await {
-            Ok(accounts) => accounts,
-            Err(_) => return Err(anyhow::anyhow!("FailedToGetProgramAccounts")),
-        };
-        all_accounts.extend(accounts);
-        tokio::time::sleep(Duration::from_secs(1)).await;
-    }
-    Ok(all_accounts)
+    Ok(vec![])
 }
 
 pub async fn get_all_gpa(

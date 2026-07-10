@@ -15,6 +15,7 @@ path = "src/main.rs"
 dex = { path = "../dex" }
 utils = { path = "../utils"}
 arb-core = { path  = "../arb-core"}
+klend-interface = { workspace = true }
 config = { path = "../config" }
 record = { path = "../record" }
 bloxroute-client = { path = "../bloxroute-client" }
@@ -58,5 +59,12 @@ nextblock-client = { path = "../nextblock-client"}
 nextblock-protos = { path = "../nextblock_protos"}
 clap = { version = "4.5.29", features = ["derive", "cargo"] }
 crossbeam-channel = "0.5"
+base64.workspace = true
 
+[features]
+default = ["zmq-stream"]
+ws-stream = []
+zmq-stream = []
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
 tikv-jemallocator = "0.5"

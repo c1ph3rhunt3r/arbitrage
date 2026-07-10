@@ -167,11 +167,30 @@ pub fn spawn_raydium_amm(
     cfg_opt: Option<RpcProgramAccountsConfig>,
 ) -> tokio::task::JoinHandle<RaydiumAmmGPAResult> {
     tokio::spawn(async move {
-        let result = if let Some(rpc_cfg) = cfg_opt {
+        let mut result = if let Some(rpc_cfg) = cfg_opt {
             crate::gpa::fetch_program_accounts_with_config(&url, &dex::raydium_amm::ID, rpc_cfg).await
         } else {
             crate::gpa::fetch_program_accounts(&url, &dex::raydium_amm::ID).await
         };
+        
+        // Attempt to load hardcoded pools
+        if let Ok(file_content) = std::fs::read_to_string("pools.json") {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&file_content) {
+                if let Some(raydium_pools) = json.get("raydium").and_then(|v| v.as_array()) {
+                    let mut pubkeys = Vec::new();
+                    for p in raydium_pools {
+                        if let Some(s) = p.as_str() {
+                            if let Ok(pubkey) = std::str::FromStr::from_str(s) {
+                                pubkeys.push(pubkey);
+                            }
+                        }
+                    }
+                    let hardcoded_accounts = crate::gpa::get_multiple_accounts_batched(&url, &pubkeys).await;
+                    result.extend(hardcoded_accounts);
+                }
+            }
+        }
+
         let mut raydium_amm_v4_map = HashMap::new();
         let mut pool_type_and_pubkey: HashMap<Pubkey, PoolType> = HashMap::new();
         result.into_iter().for_each(|(pubkey, account)| {
@@ -194,11 +213,30 @@ pub fn spawn_raydium_cpmm(
     cfg_opt: Option<RpcProgramAccountsConfig>,
 ) -> tokio::task::JoinHandle<RaydiumCpmmGPAResult> {
     tokio::spawn(async move {
-        let result = if let Some(rpc_cfg) = cfg_opt {
+        let mut result = if let Some(rpc_cfg) = cfg_opt {
             crate::gpa::fetch_program_accounts_with_config(&url, &dex::raydium_cpmm::ID, rpc_cfg).await
         } else {
             crate::gpa::fetch_program_accounts(&url, &dex::raydium_cpmm::ID).await
         };
+        
+        // Attempt to load hardcoded pools
+        if let Ok(file_content) = std::fs::read_to_string("pools.json") {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&file_content) {
+                if let Some(raydium_pools) = json.get("raydium").and_then(|v| v.as_array()) {
+                    let mut pubkeys = Vec::new();
+                    for p in raydium_pools {
+                        if let Some(s) = p.as_str() {
+                            if let Ok(pubkey) = std::str::FromStr::from_str(s) {
+                                pubkeys.push(pubkey);
+                            }
+                        }
+                    }
+                    let hardcoded_accounts = crate::gpa::get_multiple_accounts_batched(&url, &pubkeys).await;
+                    result.extend(hardcoded_accounts);
+                }
+            }
+        }
+
         let mut raydium_cpmm_result = RaydiumCpmmGPAResult {
             pool_type_and_pubkey: Default::default(),
             pools: Default::default(),

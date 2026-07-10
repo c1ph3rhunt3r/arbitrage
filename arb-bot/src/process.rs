@@ -235,6 +235,7 @@ pub fn process_message(
 //     }
 // }
 
+#[cfg(feature = "zmq-stream")]
 pub fn partial_deser_v2(tx: crossbeam_channel::Sender<MessagesV2>) {
     let ctx = zmq2::Context::new();
 
@@ -257,6 +258,73 @@ pub fn partial_deser_v2(tx: crossbeam_channel::Sender<MessagesV2>) {
     }
 }
 
+#[cfg(feature = "ws-stream")]
+pub async fn ws_deser_v2(tx: crossbeam_channel::Sender<MessagesV2>, ws_url: String) {
+    use solana_client::nonblocking::pubsub_client::PubsubClient;
+    use solana_client::rpc_config::{RpcProgramAccountsConfig, RpcAccountInfoConfig};
+    use solana_account_decoder::UiAccountEncoding;
+    use futures::StreamExt;
+    
+    let pubsub_client = match PubsubClient::new(&ws_url).await {
+        Ok(client) => client,
+        Err(e) => {
+            error!("Failed to connect to WebSocket: {:?}", e);
+            return;
+        }
+    };
+    
+    let config = RpcProgramAccountsConfig {
+        account_config: RpcAccountInfoConfig {
+            encoding: Some(UiAccountEncoding::Base64),
+            ..RpcAccountInfoConfig::default()
+        },
+        ..RpcProgramAccountsConfig::default()
+    };
+
+    // Subscribing to main DEXs and Token Programs to avoid exhausting RPC limits
+    let programs_to_subscribe = vec![
+        dex::raydium_amm::ID,
+        dex::raydium_clmm::ID,
+        dex::orca::ID,
+        dex::meteora_dlmm::ID,
+        dex::pump_amm::ID,
+        spl_token::ID,
+    ];
+
+    let mut streams = vec![];
+    for program_id in programs_to_subscribe {
+        let (stream, _unsub) = pubsub_client.program_subscribe(&program_id, Some(config.clone())).await.unwrap();
+        // Since we need to know which program_id it is, we can map the stream, but wait, the program_id is inside response.value.account.owner!
+        // So we can just use select_all.
+        streams.push(stream);
+    }
+    
+    let mut all_streams = futures::stream::select_all(streams);
+    while let Some(response) = all_streams.next().await {
+        let data_str = match &response.value.account.data {
+            solana_account_decoder::UiAccountData::Binary(data, _) => Some(data.as_str()),
+            solana_account_decoder::UiAccountData::LegacyBinary(data) => Some(data.as_str()),
+            _ => None,
+        };
+        if let Some(data) = data_str {
+            use base64::Engine;
+            if let Ok(decoded_data) = base64::engine::general_purpose::STANDARD.decode(data) {
+                let msg = Message {
+                    pubkey: std::str::FromStr::from_str(&response.value.pubkey).unwrap(),
+                    owner: std::str::FromStr::from_str(&response.value.account.owner).unwrap(),
+                    data: decoded_data,
+                };
+                let messages = MessagesV2 {
+                    message: vec![msg],
+                    slot: 0,
+                };
+                let _ = tx.send(messages);
+            }
+        }
+    }
+}
+
+#[cfg(feature = "zmq-stream")]
 pub async fn get_slot(tx: Sender<(u64, String)>) {
     let ctx = zmq2::Context::new();
     let socket = ctx.socket(zmq2::SUB).unwrap();
@@ -271,6 +339,26 @@ pub async fn get_slot(tx: Sender<(u64, String)>) {
             let status = String::from_utf8(payload[8..].to_vec()).or_panic("FailedToConvertStatus");
             let _ = tx.send((slot, status));
         }
+    }
+}
+
+#[cfg(feature = "ws-stream")]
+pub async fn ws_get_slot(tx: Sender<(u64, String)>, ws_url: String) {
+    use solana_client::nonblocking::pubsub_client::PubsubClient;
+    use futures::StreamExt;
+    
+    let pubsub_client = match PubsubClient::new(&ws_url).await {
+        Ok(client) => client,
+        Err(e) => {
+            error!("Failed to connect to WebSocket: {:?}", e);
+            return;
+        }
+    };
+    
+    let (mut stream, _unsub) = pubsub_client.slot_subscribe().await.unwrap();
+    
+    while let Some(slot_info) = stream.next().await {
+        let _ = tx.send((slot_info.slot, "processed".to_string()));
     }
 }
 
@@ -307,7 +395,7 @@ pub async fn get_channel_for_blockhash(blockhash_rpc: String) -> Sender<Hash> {
     tx_blockhash
 }
 
-// TODO: volať na result get_partial_data
+// TODO: call get_partial_data on result
 pub fn add_to_calculator(
     pool_type: &PoolType,
     pubkey: &Pubkey,
@@ -427,7 +515,7 @@ pub fn add_to_calculator(
 //                                 tip: Some(min_reward),
 //                                 use_staked_rp_cs: Some(true),
 //                                 allow_back_run: Some(false),
-//                                 fast_best_effort: Some(true), // vyhodnotiť podľa situácie
+//                                 fast_best_effort: Some(true), // evaluate according to the situation
 //                                 revenue_address: None,
 //                                 sniping: None,
 //                                 submit_protection: None,
@@ -574,7 +662,7 @@ pub fn add_to_calculator(
 //                         //         tip: Some(min_reward),
 //                         //         use_staked_rp_cs: Some(true),
 //                         //         allow_back_run: Some(false),
-//                         //         fast_best_effort: Some(true), // vyhodnotiť podľa situácie
+//                         //         fast_best_effort: Some(true), // evaluate according to the situation
 //                         //         revenue_address: None,
 //                         //         sniping: None,
 //                         //         submit_protection: None,

@@ -37,7 +37,9 @@ use arb_bot::providers::{get_providers, Provider, ProviderType};
 use config::{dump_config, Config, JitoConfig, CONFIG as cfg};
 use utils::queue::Queue;
 
+#[cfg(not(target_os = "windows"))]
 use tikv_jemallocator::Jemalloc;
+#[cfg(not(target_os = "windows"))]
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
 
@@ -613,8 +615,11 @@ fn main() -> anyhow::Result<()> {
             }
         }
     });
+    #[cfg(feature = "zmq-stream")]
+    partial_deser_v2(tx_messages.clone());
 
-    partial_deser_v2(tx_messages);
+    #[cfg(feature = "ws-stream")]
+    runtime.block_on(arb_bot::process::ws_deser_v2(tx_messages, cfg.ws.clone()));
 
     Ok(())
 }

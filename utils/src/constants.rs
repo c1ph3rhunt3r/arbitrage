@@ -11,7 +11,8 @@ pub const STABLECOINS: [Pubkey; 4] = [USDC, USDT, USDG, PYUSD];
 
 // Program IDs - replace with actual program IDs!!!
 pub const SWAP_PROGRAM_ID: Pubkey = pubkey!("Xx11111111111111111111111111111111111111111");
-pub const FLASHLOAN_ID: Pubkey = pubkey!("Xx11111111111111111111111111111111111111111");
+pub const FLASHLOAN_ID: Pubkey = pubkey!("KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD");
+pub const KAMINO_MAIN_MARKET: Pubkey = pubkey!("7u3HeHxYDLhnCoErrpiSYLS761M12zZDBpZ1mD2F7GfD");
 pub const ADDRESS_LOOKUP_TABLE: Pubkey = pubkey!("Xx11111111111111111111111111111111111111111");
 
 pub const ADDRESS_LOOKUP_TABLE_PROGRAM_ID: Pubkey = pubkey!("AddressLookupTab1e1111111111111111111111111");

@@ -56,11 +56,29 @@ pub fn spawn_pump_amm(
     cfg_opt: Option<RpcProgramAccountsConfig>,
 ) -> tokio::task::JoinHandle<PumpAmmGPAResult> {
     tokio::spawn(async move {
-        let result = if let Some(rpc_cfg) = cfg_opt {
+        let mut result = if let Some(rpc_cfg) = cfg_opt {
             crate::gpa::fetch_program_accounts_with_config(&url, &dex::pump_amm::ID, rpc_cfg).await
         } else {
             crate::gpa::fetch_program_accounts(&url, &dex::pump_amm::ID).await
         };
+        
+        // Attempt to load hardcoded pools
+        if let Ok(file_content) = std::fs::read_to_string("pools.json") {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&file_content) {
+                if let Some(pump_pools) = json.get("pump").and_then(|v| v.as_array()) {
+                    let mut pubkeys = Vec::new();
+                    for p in pump_pools {
+                        if let Some(s) = p.as_str() {
+                            if let Ok(pubkey) = std::str::FromStr::from_str(s) {
+                                pubkeys.push(pubkey);
+                            }
+                        }
+                    }
+                    let hardcoded_accounts = crate::gpa::get_multiple_accounts_batched(&url, &pubkeys).await;
+                    result.extend(hardcoded_accounts);
+                }
+            }
+        }
         let mut pump_amm_result = PumpAmmGPAResult {
             pool_type_and_pubkey: Default::default(),
             pools: Default::default(),

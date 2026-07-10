@@ -7,7 +7,7 @@ use solana_sdk::hash::Hash;
 use solana_sdk::message::AddressLookupTableAccount;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::{Keypair, Signer};
-use spl_associated_token_account::get_associated_token_address;
+
 use utils::constants::{ADDRESS_LOOKUP_TABLE, FLASHLOAN_ID};
 use utils::safe::ResultExt;
 
@@ -42,27 +42,34 @@ pub async fn fetch_balance() -> u64 {
     }
 }
 
-pub async fn fetch_flashloan_keys() -> AHashMap<Pubkey, (Pubkey, Pubkey)> {
+pub async fn fetch_flashloan_keys() -> AHashMap<Pubkey, (Pubkey, Pubkey, Pubkey, Pubkey)> {
     let rpc_client = RpcClient::new(cfg.rpc.clone());
+    let config = solana_client::rpc_config::RpcProgramAccountsConfig {
+        filters: Some(vec![solana_client::rpc_filter::RpcFilterType::DataSize(8624)]),
+        account_config: solana_client::rpc_config::RpcAccountInfoConfig {
+            encoding: Some(solana_account_decoder::UiAccountEncoding::Base64),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    
     let accounts = rpc_client
-        .get_program_accounts(&FLASHLOAN_ID)
+        .get_program_accounts_with_config(&FLASHLOAN_ID, config)
         .await
         .or_panic("FailedToLoadFlashloanAccounts");
 
     let mut flashloan_keys = AHashMap::new();
     for (pool_pubkey, account) in accounts.iter() {
-        if account.data.len() == 65 {
-            let mint = Pubkey::try_from(&account.data[..32]);
-            let mint = match mint {
-                Ok(mint) => mint,
-                Err(_) => {
-                    warn!("FailedToDeserializeMint");
-                    continue;
-                }
-            };
-            let ata = get_associated_token_address(pool_pubkey, &mint);
-            info!("Flashloan pool: {} mint: {}, pool ata: {}", pool_pubkey, mint, ata);
-            flashloan_keys.insert(mint, (*pool_pubkey, ata));
+        if account.data.len() == 8624 {
+            if let Ok(reserve) = bytemuck::try_from_bytes::<klend_interface::state::Reserve>(&account.data[8..]) {
+                let mint = reserve.liquidity.mint_pubkey;
+                let lending_market = reserve.lending_market;
+                let supply_vault = reserve.liquidity.supply_vault;
+                let fee_vault = reserve.liquidity.fee_vault;
+                
+                info!("Flashloan pool: {} mint: {}, supply: {}, fee: {}", pool_pubkey, mint, supply_vault, fee_vault);
+                flashloan_keys.insert(mint, (lending_market, *pool_pubkey, supply_vault, fee_vault));
+            }
         }
     }
     if flashloan_keys.is_empty() {
@@ -72,6 +79,12 @@ pub async fn fetch_flashloan_keys() -> AHashMap<Pubkey, (Pubkey, Pubkey)> {
 }
 
 pub async fn fetch_alt() -> AddressLookupTableAccount {
+    if cfg.dry_run {
+        return AddressLookupTableAccount {
+            key: ADDRESS_LOOKUP_TABLE,
+            addresses: vec![],
+        };
+    }
     let rpc_client = RpcClient::new(cfg.rpc.clone());
     let alt = rpc_client.get_account_data(&ADDRESS_LOOKUP_TABLE).await;
     match alt {

@@ -91,7 +91,7 @@ pub fn process_orca(
             }
         }
     } else if data.starts_with(&TICK_ARRAY_DISCRIMINATOR) {
-        // TODO: ak sú len 2-comb, tu by som nemal vkladať tick_array, ak tick_array.whirlpool nemá WSOL!
+        // TODO: if only 2-comb, we shouldn't insert tick_array here if tick_array.whirlpool doesn't have WSOL!
         let tick_array = OrcaTickArray::deserialize(data).context("Failed to deserialize orca tick array")?;
         let not_empty = tick_array.ticks.iter().any(|x| x.liquidity_gross > 0);
         let whirlpool = tick_array.whirlpool;
@@ -111,7 +111,7 @@ pub fn process_orca(
         }
     } else if data.starts_with(&dex::orca::DYNAMIC_TICK_ARRAY_DISCRIMINATOR) {
         // TODO: process
-        // TODO: ak sú len 2-comb, tu by som nemal vkladať tick_array, ak tick_array.whirlpool nemá WSOL!
+        // TODO: if only 2-comb, we shouldn't insert tick_array here if tick_array.whirlpool doesn't have WSOL!
         let tick_array =
             OrcaTickArray::deserialize_from_dynamic(data).context("Failed to deserialize orca tick array")?;
         let not_empty = tick_array.ticks.iter().any(|x| x.liquidity_gross > 0);
@@ -144,11 +144,29 @@ pub fn process_orca(
 
 pub fn spawn_orca(url: String, cfg_opt: Option<RpcProgramAccountsConfig>) -> tokio::task::JoinHandle<OrcaGPAResult> {
     tokio::spawn(async move {
-        let result = if let Some(rpc_cfg) = cfg_opt {
+        let mut result = if let Some(rpc_cfg) = cfg_opt {
             crate::gpa::fetch_program_accounts_with_config(&url, &dex::orca::ID, rpc_cfg).await
         } else {
             crate::gpa::fetch_program_accounts(&url, &dex::orca::ID).await
         };
+        
+        // Attempt to load hardcoded pools
+        if let Ok(file_content) = std::fs::read_to_string("pools.json") {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&file_content) {
+                if let Some(orca_pools) = json.get("orca").and_then(|v| v.as_array()) {
+                    let mut pubkeys = Vec::new();
+                    for p in orca_pools {
+                        if let Some(s) = p.as_str() {
+                            if let Ok(pubkey) = std::str::FromStr::from_str(s) {
+                                pubkeys.push(pubkey);
+                            }
+                        }
+                    }
+                    let hardcoded_accounts = crate::gpa::get_multiple_accounts_batched(&url, &pubkeys).await;
+                    result.extend(hardcoded_accounts);
+                }
+            }
+        }
         let mut orca_pools: HashMap<Pubkey, OrcaWhirlpool> = HashMap::new();
         let mut orca_tick_arrays: HashMap<Pubkey, BTreeMap<i32, (Pubkey, OrcaTickArray)>> = HashMap::new();
         let mut pool_type_and_pubkey: HashMap<Pubkey, PoolType> = HashMap::new();
@@ -188,11 +206,29 @@ pub fn spawn_orca_swap_v2(
     cfg_opt: Option<RpcProgramAccountsConfig>,
 ) -> tokio::task::JoinHandle<OrcaSwapV2GPAResult> {
     tokio::spawn(async move {
-        let result = if let Some(rpc_cfg) = cfg_opt {
+        let mut result = if let Some(rpc_cfg) = cfg_opt {
             crate::gpa::fetch_program_accounts_with_config(&url, &dex::orca_swap_v2::ID, rpc_cfg).await
         } else {
             crate::gpa::fetch_program_accounts(&url, &dex::orca_swap_v2::ID).await
         };
+        
+        // Attempt to load hardcoded pools
+        if let Ok(file_content) = std::fs::read_to_string("pools.json") {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&file_content) {
+                if let Some(orca_pools) = json.get("orca_v2").and_then(|v| v.as_array()) {
+                    let mut pubkeys = Vec::new();
+                    for p in orca_pools {
+                        if let Some(s) = p.as_str() {
+                            if let Ok(pubkey) = std::str::FromStr::from_str(s) {
+                                pubkeys.push(pubkey);
+                            }
+                        }
+                    }
+                    let hardcoded_accounts = crate::gpa::get_multiple_accounts_batched(&url, &pubkeys).await;
+                    result.extend(hardcoded_accounts);
+                }
+            }
+        }
         let mut orca_swap_v2_result = OrcaSwapV2GPAResult {
             pool_type_and_pubkey: Default::default(),
             markets: Default::default(),

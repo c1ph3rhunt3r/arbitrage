@@ -118,7 +118,7 @@ pub fn rebalance() -> Sender<u64> {
                             let _ = builder.close_ata_ix(&token_ata_wsol);
                             builder.add_create_ata_if_not_exists(&WSOL);
 
-                            // Ak MAX WSOL je nie 0, je to pre Jito = doplním prachy do WSOL (nemá flashloan, nemá prachy)
+                            // If MAX WSOL is not 0, it is for Jito = replenish funds in WSOL (has no flashloan, has no funds)
                             if max_wsol > 0 {
                                 builder.add_system_transfer_ix(max_wsol, &token_ata_wsol);
                                 builder.add_sync_native(&token_ata_wsol);
