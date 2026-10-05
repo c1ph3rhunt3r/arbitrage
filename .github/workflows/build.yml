@@ -25,7 +25,11 @@ jobs:
           sudo apt-get install -y protobuf-compiler libzmq3-dev pkg-config libssl-dev build-essential
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.84.1
+
+      - name: Update ethnum to compatible version
+        run: |
+          cargo update -p ethnum || true
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
