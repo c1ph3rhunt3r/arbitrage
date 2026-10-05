@@ -276,7 +276,7 @@ pub fn div_round_up_if(n: u128, d: u128, round_up: bool) -> anyhow::Result<u128>
 
     let q = n / d;
 
-    Ok(if round_up && !n.is_multiple_of(d) { q + 1 } else { q })
+    Ok(if round_up && (n % d != 0) { q + 1 } else { q })
 }
 
 pub fn div_round_up_if_u256(n: U256Muldiv, d: U256Muldiv, round_up: bool) -> anyhow::Result<u128> {

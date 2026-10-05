@@ -187,7 +187,7 @@ pub trait Provider {
 
     fn log_counter(counter: Arc<AtomicU64>) {
         let count = counter.load(std::sync::atomic::Ordering::Relaxed);
-        if count.is_multiple_of(1000) {
+        if count % 1000 == 0 {
             info!("Jito counter: {}", count);
         }
     }
