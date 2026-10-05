@@ -14,3 +14,4 @@ pub mod optimizer;
 pub mod priority_fee;
 pub mod rebalancer;
 pub mod velocity;
+pub mod ws_stream;

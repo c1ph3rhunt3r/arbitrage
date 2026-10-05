@@ -13,3 +13,7 @@ scripts/arb_monitor.toml
 perf.data
 .DS_Store
 /arb-bot/src/providers/target
+config.toml
+*.keypair.json
+dummy_keypair.json
+id.json

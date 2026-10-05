@@ -1,0 +1,58 @@
+# ==============================================================================
+# Solana Arbitrage Bot — Paper Trading & Zero-Cost Simulation Config
+# ==============================================================================
+# This configuration is tuned for:
+# 1. $0.00 Cost (Uses "log" provider — no real transactions, no gas/tips paid)
+# 2. Low Resource Usage (< 1 GB RAM, 2-4 CPU threads — fits Oracle Free Tier)
+# 3. 2-Hop Arbitrage (Raydium, Orca, Meteora, Pump.fun)
+# ==============================================================================
+
+name = "PaperTrader"
+log_level = "info"
+region = "EU"
+
+# ------------------------------------------------------------------------------
+# RPC Endpoints (Can use Helius / Alchemy / QuickNode Free Tiers)
+# ------------------------------------------------------------------------------
+# Replace with your free RPC endpoints
+rpc = "https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY"
+ws = "wss://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY"
+blockhash_and_simulate_rpc = "https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY"
+
+grpc_pem = ""
+grpc_auth_token = ""
+
+# Keypair path (A dummy or zero-balance keypair is fine for paper trading)
+keypair = "./dummy_keypair.json"
+
+# ------------------------------------------------------------------------------
+# Execution Provider: "log" = Paper Trading Simulation Mode ($0 Cost)
+# Available: "log", "jito", "bloxroute", "nextblock"
+# ------------------------------------------------------------------------------
+providers = "log"
+
+# ------------------------------------------------------------------------------
+# Arbitrage Engine Tuning (Low CPU / Low Memory)
+# ------------------------------------------------------------------------------
+[arbitrage]
+c2 = true                          # Enable 2-hop arbitrage (Pool A -> Pool B)
+c3 = false                         # Disable 3-hop initially to keep CPU low
+optimization_threads = 4           # 4 threads (Fits 4-core Oracle ARM / budget VPS)
+price_map_size = 6                 # Depth of orderbook price buckets
+opportunity_filter_factor = 5      # Filter noise threshold
+min_amount_for_flashloan = 1000000000000  # High threshold to prioritize small wallet arbs
+optimize_method = "convex"         # Fast logarithmic ternary search
+min_wsol = 10000000                # Minimum trade size (0.01 WSOL)
+
+# ------------------------------------------------------------------------------
+# Address Lookup Table & Database Settings
+# ------------------------------------------------------------------------------
+[atl_manager]
+path = "./tables"
+
+[wallet_manager]
+rebalance_interval = 3600
+
+[telegram]
+teloxide_token = ""
+notification_channel_id = 0

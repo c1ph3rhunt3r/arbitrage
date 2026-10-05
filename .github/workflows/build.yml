@@ -1,0 +1,65 @@
+name: Build arb-bot Linux Binary
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Compile Release Binary
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler libzmq3-dev pkg-config libssl-dev build-essential
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build arb-bot binary
+        run: |
+          cargo build --release --bin arb-bot
+
+      - name: Package binary
+        run: |
+          mkdir -p dist
+          cp target/release/arb-bot dist/arb-bot
+          chmod +x dist/arb-bot
+          cd dist
+          tar -czvf arb-bot-linux-x86_64.tar.gz arb-bot
+          sha256sum arb-bot-linux-x86_64.tar.gz > SHA256SUMS
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arb-bot-linux-x86_64
+          path: dist/arb-bot-linux-x86_64.tar.gz
+
+      - name: Publish Release Asset
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: latest-build
+          name: "Latest arb-bot Linux x86_64 Build"
+          body: "Automated release binary compiled via GitHub Actions."
+          files: |
+            dist/arb-bot-linux-x86_64.tar.gz
+            dist/SHA256SUMS
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

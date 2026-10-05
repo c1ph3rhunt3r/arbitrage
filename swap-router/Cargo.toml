@@ -1,0 +1,18 @@
+[package]
+name = "swap-router"
+version = "0.1.0"
+description = "Atomic Swap Router Program for Solana Arbitrage"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+solana-program = "2.1.0"
+spl-token = "7.0.0"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+overflow-checks = true
