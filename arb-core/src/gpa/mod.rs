@@ -1,5 +1,5 @@
 use ahash::{AHashMap as HashMap, AHashSet};
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use solana_account_decoder::UiAccountEncoding;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig};
@@ -290,45 +290,6 @@ pub struct GPAResult {
     pub saros_dlmm_bin_arrays: HashMap<Pubkey, BTreeMap<u32, (Pubkey, dex::saros_dlmm::BinArray)>>,
 
     pub token_mints: HashSet<Pubkey>,
-}
-
-impl Default for GPAResult {
-    fn default() -> Self {
-        Self {
-            pump_amm_map: HashMap::default(),
-            pump_amm_config: HashMap::default(),
-            pump_amm_fee_config: HashMap::default(),
-            pump_amm_pool_to_mint_supply: HashMap::default(),
-            orca_tick_arrays: HashMap::default(),
-            orca_pools: HashMap::default(),
-            orca_oracles: HashMap::default(),
-            orca_pool_to_oracle: HashMap::default(),
-            raydium_clmm_tick_arrays: HashMap::default(),
-            raydium_clmm_pools: HashMap::default(),
-            raydium_clmm_config: HashMap::default(),
-            raydium_bitmap_extensions: HashMap::default(),
-            meteora_dlmm_pools: HashMap::default(),
-            meteora_dlmm_bin_arrays: HashMap::default(),
-            meteora_dlmm_bitmap_extensions: HashMap::default(),
-            raydium_amm_v4_map: HashMap::default(),
-            ta_amount_map: HashMap::default(),
-            pool_type_and_pubkey: HashMap::default(),
-            stabble_stable_swap_map: HashMap::default(),
-            stabble_weighted_swap_map: HashMap::default(),
-            raydium_cpmm_pools: HashMap::default(),
-            raydium_cpmm_configs: HashMap::default(),
-            orca_swap_v2_markets: HashMap::default(),
-            orca_swap_v2_authorities: HashMap::default(),
-            saros_amm_markets: HashMap::default(),
-            saros_amm_authorities: HashMap::default(),
-            meteora_damm_v2_pools: HashMap::default(),
-            fusion_amm_pools: HashMap::default(),
-            fusion_amm_tick_arrays: HashMap::default(),
-            saros_dlmm_pools: HashMap::default(),
-            saros_dlmm_bin_arrays: HashMap::default(),
-            token_mints: HashSet::default(),
-        }
-    }
 }
 
 // impl GPAResult {
