@@ -24,6 +24,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler libzmq3-dev pkg-config libssl-dev build-essential
 
+      - name: Setup Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.84.1
 
