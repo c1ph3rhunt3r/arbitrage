@@ -292,6 +292,45 @@ pub struct GPAResult {
     pub token_mints: HashSet<Pubkey>,
 }
 
+impl Default for GPAResult {
+    fn default() -> Self {
+        Self {
+            pump_amm_map: HashMap::default(),
+            pump_amm_config: HashMap::default(),
+            pump_amm_fee_config: HashMap::default(),
+            pump_amm_pool_to_mint_supply: HashMap::default(),
+            orca_tick_arrays: HashMap::default(),
+            orca_pools: HashMap::default(),
+            orca_oracles: HashMap::default(),
+            orca_pool_to_oracle: HashMap::default(),
+            raydium_clmm_tick_arrays: HashMap::default(),
+            raydium_clmm_pools: HashMap::default(),
+            raydium_clmm_config: HashMap::default(),
+            raydium_bitmap_extensions: HashMap::default(),
+            meteora_dlmm_pools: HashMap::default(),
+            meteora_dlmm_bin_arrays: HashMap::default(),
+            meteora_dlmm_bitmap_extensions: HashMap::default(),
+            raydium_amm_v4_map: HashMap::default(),
+            ta_amount_map: HashMap::default(),
+            pool_type_and_pubkey: HashMap::default(),
+            stabble_stable_swap_map: HashMap::default(),
+            stabble_weighted_swap_map: HashMap::default(),
+            raydium_cpmm_pools: HashMap::default(),
+            raydium_cpmm_configs: HashMap::default(),
+            orca_swap_v2_markets: HashMap::default(),
+            orca_swap_v2_authorities: HashMap::default(),
+            saros_amm_markets: HashMap::default(),
+            saros_amm_authorities: HashMap::default(),
+            meteora_damm_v2_pools: HashMap::default(),
+            fusion_amm_pools: HashMap::default(),
+            fusion_amm_tick_arrays: HashMap::default(),
+            saros_dlmm_pools: HashMap::default(),
+            saros_dlmm_bin_arrays: HashMap::default(),
+            token_mints: HashSet::default(),
+        }
+    }
+}
+
 // impl GPAResult {
 //     pub fn to_calculators(&self, slot: u64) -> Vec<CalculatorEnum> {
 //         let mut calculators = Vec::with_capacity(self.pool_type_and_pubkey.len());
@@ -370,7 +409,7 @@ pub async fn sync_gpa(url: &str) -> anyhow::Result<GPAResult> {
                     error!("Failed to send GPA result: {:?}", e);
                 }
             } else {
-                panic!("GPA error");
+                warn!("GPA error: failed to fetch accounts via public RPC (likely rate-limited). Initializing empty snapshot.");
             }
         }
     });
@@ -448,9 +487,9 @@ pub async fn sync_gpa(url: &str) -> anyhow::Result<GPAResult> {
 
     let ctx = zmq2::Context::new();
     let socket = ctx.socket(zmq2::SUB).unwrap();
-    socket
-        .connect("ipc:///tmp/accounts_zmq_v2.sock")
-        .or_panic("FailedToConnect");
+    if let Err(e) = socket.connect("ipc:///tmp/accounts_zmq_v2.sock") {
+        warn!("FailedToConnect to local ZMQ: {:?}. Running without local ZMQ stream.", e);
+    }
     let _ = socket.set_subscribe(b"");
 
     let (tx_socket, mut rx_socket) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();

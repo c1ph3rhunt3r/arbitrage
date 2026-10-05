@@ -6,7 +6,7 @@ use arb_bot::OptimizeResult;
 use arb_core::arbitrage::OpportunityWithCalculators;
 use arb_core::calculator::CalculatorEnum;
 
-use arb_core::gpa::{sync_gpa, PoolToCalculator};
+use arb_core::gpa::{sync_gpa, GPAResult, PoolToCalculator};
 
 use clap::{crate_name, crate_version, Parser};
 use crossbeam_channel::unbounded;
@@ -416,17 +416,23 @@ fn main() -> anyhow::Result<()> {
 
     info!("Opportunity calculation thread started...");
 
-    let mut result = runtime.block_on(async { sync_gpa(&cfg.rpc).await })?;
+    let mut result = if cfg.ws.starts_with("ws") || cfg.providers == "log" {
+        info!("Remote/Paper-trading mode: skipping full GPA sync to conserve RAM & public RPC rate limits");
+        GPAResult::default()
+    } else {
+        runtime.block_on(async { sync_gpa(&cfg.rpc).await })?
+    };
 
     let client = solana_client::rpc_client::RpcClient::new(cfg.blockhash_and_simulate_rpc.clone());
-    let account_data = client
-        .get_account_data(&dex::pump_amm::FEE_CONFIG)
-        .or_panic("FailedToFetchPumpAmmFeeConfig");
-    let fee_account =
-        dex::pump_amm::FeeConfig::deserialize(&account_data).or_panic("FailedToDeserializePumpAmmFeeConfig");
-    result
-        .pump_amm_fee_config
-        .insert(dex::pump_amm::FEE_CONFIG, fee_account);
+    if let Ok(account_data) = client.get_account_data(&dex::pump_amm::FEE_CONFIG) {
+        if let Ok(fee_account) = dex::pump_amm::FeeConfig::deserialize(&account_data) {
+            result
+                .pump_amm_fee_config
+                .insert(dex::pump_amm::FEE_CONFIG, fee_account);
+        }
+    } else {
+        warn!("Failed to fetch PumpAMM fee config via RPC; continuing without it");
+    }
 
     info!("Runtimes created: {}", runtimes.len());
 
@@ -613,7 +619,18 @@ fn main() -> anyhow::Result<()> {
         }
     });
 
-    partial_deser_v2(tx_messages);
+    if cfg.ws.starts_with("ws") {
+        info!("Starting remote WebSocket stream on {}...", cfg.ws);
+        let pools = arb_bot::ws_stream::get_default_monitored_pools();
+        runtime.block_on(async {
+            arb_bot::ws_stream::stream_accounts_ws(cfg.ws.clone(), pools, tx_messages).await;
+            loop {
+                tokio::time::sleep(Duration::from_secs(3600)).await;
+            }
+        });
+    } else {
+        partial_deser_v2(tx_messages);
+    }
 
     Ok(())
 }

@@ -104,3 +104,19 @@ pub async fn stream_accounts_ws(
         });
     }
 }
+
+/// Returns a default list of highly active Solana DEX pool accounts to monitor via WebSocket.
+pub fn get_default_monitored_pools() -> Vec<Pubkey> {
+    let pool_strs = [
+        "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2", // Raydium AMM SOL/USDC
+        "7XawhbbxtsRcQA8KTkHT9f9nc6d69UwqCDh6U5EEbEmX", // Raydium AMM SOL/USDT
+        "HJPjoWUrhoZzkNfRpHuieeFKAvVQDDUsPmeeNTpaafP", // Orca Whirlpool SOL/USDC
+        "4BpEtYPZcEGU7KxN9jPHkEWeA4TdQ9n8Wb8p6j1oUSiY", // Orca Whirlpool SOL/USDT
+        "AVs9TA4nWDzfPJE9gGVNJMVhcQy3V9PGazuz33BfG2RA", // Raydium AMM RAY/SOL
+        "ARwi1S4DaiTG5DX7S4M4ZsrXqpMD1MrTmbu9ue2tpmEq", // Meteora DLMM SOL/USDC
+    ];
+    pool_strs
+        .iter()
+        .filter_map(|s| Pubkey::from_str(s).ok())
+        .collect()
+}
