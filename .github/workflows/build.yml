@@ -34,6 +34,10 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
+      - name: Pre-build sanity check
+        run: |
+          cargo check --release --bin arb-bot
+
       - name: Build arb-bot binary
         run: |
           cargo build --release --bin arb-bot

@@ -222,7 +222,7 @@ fn main() -> anyhow::Result<()> {
 
     std::thread::spawn({
         let alt_path = cfg.atl_manager.path.clone();
-        async move || {
+        move || {
             let checksum_file_path = format!("{}/.checksum", alt_path.clone());
             let mut last_checksum = utils::directory_hash::DirectoryHash::read_from_file(checksum_file_path.clone())
                 .unwrap_or_else(|err| {
@@ -242,8 +242,7 @@ fn main() -> anyhow::Result<()> {
                         let res = get_tables_v2();
                         if let Ok((pool_to_table_key, table_key_to_table, pool_pubkey_to_optionals)) = res {
                             let _ = tx_update_alts
-                                .send((pool_to_table_key, table_key_to_table, pool_pubkey_to_optionals))
-                                .await;
+                                .blocking_send((pool_to_table_key, table_key_to_table, pool_pubkey_to_optionals));
                             info!("ALT: sent updated tables {:?}", last_checksum);
                             break;
                         } else {
